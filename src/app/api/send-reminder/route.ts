@@ -1,16 +1,30 @@
 import { NextResponse } from "next/server";
+import { z } from "zod";
+
+// Définition du schéma de validation d'entrée
+const reminderSchema = z.object({
+  email: z.string().email("Format d'e-mail invalide."),
+  taskName: z.string().min(1, "Le nom de la tâche ne peut pas être vide.").max(255, "Le nom de la tâche est trop long."),
+  dueDate: z.string().optional().nullable(),
+});
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, taskName, dueDate } = body;
-
-    if (!email || !taskName) {
+    
+    // Validation stricte du corps de la requête avec Zod
+    const validation = reminderSchema.safeParse(body);
+    if (!validation.success) {
       return NextResponse.json(
-        { error: "Paramètres 'email' et 'taskName' requis." },
+        { 
+          error: "Données d'entrée invalides.", 
+          details: validation.error.flatten().fieldErrors 
+        },
         { status: 400 }
       );
     }
+
+    const { email, taskName, dueDate } = validation.data;
 
     console.log(`[RAPPEL EMAIL SIMULÉ] Envoyé à: ${email}`);
     console.log(`Tâche: "${taskName}"`);
