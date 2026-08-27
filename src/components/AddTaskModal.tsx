@@ -13,7 +13,6 @@ export const AddTaskModal: React.FC = () => {
   const [customDuration, setCustomDuration] = useState<string>("");
   const [dueDate, setDueDate] = useState("");
 
-  // Wizard state for mobile
   const [currentStep, setCurrentStep] = useState(1);
   const totalSteps = 3;
 
@@ -27,12 +26,11 @@ export const AddTaskModal: React.FC = () => {
       name: name.trim(),
       description: description.trim() || undefined,
       priority,
-      estimatedPomodoros: sessionDuration, // Stored in estimated_pomodoros as minutes
+      estimatedPomodoros: sessionDuration,
       status: "todo",
       dueDate: dueDate ? new Date(dueDate).toISOString() : undefined,
     });
 
-    // Reset Form
     setName("");
     setDescription("");
     setPriority("medium");
@@ -43,243 +41,197 @@ export const AddTaskModal: React.FC = () => {
     setIsAddTaskOpen(false);
   };
 
-  const handleNext = () => {
-    if (currentStep < totalSteps) setCurrentStep(currentStep + 1);
-  };
+  const handleNext = () => currentStep < totalSteps && setCurrentStep(currentStep + 1);
+  const handlePrev = () => currentStep > 1 && setCurrentStep(currentStep - 1);
 
-  const handlePrev = () => {
-    if (currentStep > 1) setCurrentStep(currentStep - 1);
+  // Semantic Colors for Priority
+  const getPriorityStyle = (p: string, isSelected: boolean) => {
+    if (!isSelected) return "border-border-glass text-on-surface-variant hover:border-on-surface-variant";
+    switch (p) {
+      case "low": return "bg-green-500/10 border-green-500/50 text-green-600 dark:text-green-400";
+      case "medium": return "bg-yellow-500/10 border-yellow-500/50 text-yellow-600 dark:text-yellow-400";
+      case "high": return "bg-orange-500/10 border-orange-500/50 text-orange-600 dark:text-orange-400";
+      case "deep_work": return "bg-purple-500/10 border-purple-500/50 text-purple-600 dark:text-purple-400";
+      default: return "";
+    }
   };
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 font-sans">
-      {/* Heavy glass blur backdrop overlay */}
       <div 
         onClick={() => setIsAddTaskOpen(false)}
-        className="absolute inset-0 bg-black/50 backdrop-blur-[35px] transition-all"
+        className="absolute inset-0 bg-background/40 backdrop-blur-sm transition-all"
       ></div>
 
-      {/* Modal Container Card */}
-      <div className="relative w-full max-w-md bg-surface-glass backdrop-blur-2xl border border-border-glass rounded-xl shadow-2xl overflow-hidden transform transition-all duration-300 scale-100 opacity-100 z-10 flex flex-col max-h-[90vh]">
+      <div className="relative w-full max-w-lg bg-surface-glass border border-border-glass rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
         
-        {/* Subtle orange ambient glow in the top corner */}
-        <div className="absolute -top-20 -right-20 w-40 h-40 bg-primary/10 rounded-full blur-[60px] pointer-events-none"></div>
-
-        {/* Modal Header */}
-        <div className="px-5 py-3.5 border-b border-border-glass flex flex-col bg-surface-container/20 shrink-0">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-border-glass/50 flex flex-col bg-surface-glass shrink-0">
           <div className="flex justify-between items-center">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-md bg-surface-glass border border-border-glass flex items-center justify-center">
-                <span className="material-symbols-outlined text-primary text-[18px]">add_task</span>
-              </div>
-              <h2 className="text-base font-bold text-on-surface tracking-tight">Nouvelle Tâche</h2>
-            </div>
+            <h2 className="text-xl font-bold tracking-tight text-on-background">Nouvelle Tâche</h2>
             <button 
               onClick={() => setIsAddTaskOpen(false)}
-              className="text-on-surface-variant hover:text-on-surface transition-colors p-1 rounded-full hover:bg-surface-glass cursor-pointer"
+              className="text-on-surface-variant hover:text-error transition-colors p-1.5 rounded-full hover:bg-error/10 cursor-pointer"
             >
-              <span className="material-symbols-outlined text-[18px]">close</span>
+              <span className="material-symbols-outlined text-[20px]">close</span>
             </button>
           </div>
           
-          {/* Mobile Progress Bar */}
-          <div className="md:hidden mt-3 w-full bg-surface-glass rounded-full h-1 overflow-hidden">
-            <div 
-              className="bg-primary h-full transition-all duration-300"
-              style={{ width: `${(currentStep / totalSteps) * 100}%` }}
-            ></div>
+          <div className="md:hidden mt-4 w-full bg-surface-container rounded-full h-1 overflow-hidden">
+            <div className="bg-primary h-full transition-all duration-300" style={{ width: `${(currentStep / totalSteps) * 100}%` }}></div>
           </div>
         </div>
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
-          <div className="p-5 space-y-4 md:space-y-4 overflow-y-auto flex-1">
+          <div className="p-6 space-y-8 md:space-y-6 overflow-y-auto flex-1">
             
-            {/* Step 1: Task Name */}
+            {/* Step 1: Name */}
             <div className={`${currentStep === 1 ? 'block animate-in fade-in slide-in-from-right-4' : 'hidden md:block'}`}>
-              <div className="group">
-                <label 
-                  htmlFor="taskName" 
-                  className="text-[10px] font-bold tracking-wider uppercase text-on-surface-variant block mb-2 transition-colors group-focus-within:text-primary"
-                >
-                  Nom de la Tâche <span className="text-error">*</span>
-                </label>
+              <div className="group relative">
                 <input
                   id="taskName"
                   type="text"
                   required
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ex: Rédiger le rapport PM"
-                  className="w-full bg-surface-glass border border-border-glass rounded-lg px-4 py-3 text-sm text-on-surface placeholder-on-surface-variant/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary focus:shadow-glow-general-sm transition-all duration-300"
+                  placeholder="Qu'allez-vous accomplir ?"
+                  className="w-full bg-transparent border-b-2 border-border-glass py-3 text-lg font-medium text-on-background placeholder-on-surface-variant/40 focus:outline-none focus:border-primary transition-all duration-300 peer"
                 />
+                <label 
+                  htmlFor="taskName" 
+                  className="absolute -top-3 left-0 text-[10px] font-bold tracking-widest uppercase text-primary opacity-0 peer-focus:opacity-100 peer-valid:opacity-100 transition-all"
+                >
+                  Nom de la Tâche
+                </label>
               </div>
             </div>
 
             {/* Step 2: Duration & Description */}
-            <div className={`${currentStep === 2 ? 'block animate-in fade-in slide-in-from-right-4' : 'hidden md:block'} space-y-4`}>
-              {/* Session Duration Selection */}
+            <div className={`${currentStep === 2 ? 'block animate-in fade-in slide-in-from-right-4' : 'hidden md:block'} space-y-6`}>
               <div>
-                <label className="text-[10px] font-bold tracking-wider uppercase text-on-surface-variant block mb-2">
-                  Durée de Session (minutes)
+                <label className="text-xs font-semibold tracking-wider text-on-surface-variant block mb-3">
+                  DURÉE ESTIMÉE
                 </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {([15, 30, 45, 60] as const).map((mins) => {
+                <div className="flex flex-wrap gap-3">
+                  {([15, 25, 45, 60] as const).map((mins) => {
                     const isSelected = sessionDuration === mins && !customDuration;
                     return (
                       <button
                         key={mins}
                         type="button"
-                        onClick={() => {
-                          setSessionDuration(mins);
-                          setCustomDuration("");
-                        }}
-                        className={`px-3 py-2 rounded-lg border text-xs font-semibold transition-all cursor-pointer flex-1 md:flex-none ${
-                          isSelected
-                            ? "border-primary/50 bg-primary/10 text-primary shadow-glow-general-sm"
-                            : "border-border-glass bg-surface-glass text-on-surface-variant hover:text-on-surface"
+                        onClick={() => { setSessionDuration(mins); setCustomDuration(""); }}
+                        className={`px-4 py-2 rounded-full border text-sm font-medium transition-all cursor-pointer ${
+                          isSelected ? "border-primary bg-primary text-background shadow-md shadow-primary/20" : "border-border-glass text-on-surface hover:border-on-surface-variant"
                         }`}
                       >
                         {mins} min
                       </button>
                     );
                   })}
-                </div>
-                
-                {/* Custom Duration Input */}
-                <div className="flex items-center gap-2 mt-2 bg-surface-glass p-2 rounded-lg border border-border-glass">
-                  <span className="text-[10px] font-bold text-on-surface-variant uppercase shrink-0">Personnalisé :</span>
-                  <input
-                    type="number"
-                    min="5"
-                    max="180"
-                    value={customDuration}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setCustomDuration(val);
-                      if (val) {
-                        const parsed = parseInt(val);
-                        if (!isNaN(parsed)) {
-                          setSessionDuration(Math.max(5, Math.min(180, parsed)));
-                        }
-                      } else {
-                        setSessionDuration(25);
-                      }
-                    }}
-                    placeholder="25"
-                    className="w-16 bg-surface-container border border-border-glass rounded-md px-2 py-1 text-xs text-on-surface text-center focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary"
-                  />
-                  <span className="text-xs text-on-surface-variant">min</span>
+                  <div className="flex items-center gap-2 px-3 py-1 rounded-full border border-border-glass focus-within:border-primary transition-colors">
+                    <input
+                      type="number"
+                      min="5" max="180"
+                      value={customDuration}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setCustomDuration(val);
+                        if (val && !isNaN(parseInt(val))) setSessionDuration(Math.max(5, Math.min(180, parseInt(val))));
+                      }}
+                      placeholder="..."
+                      className="w-10 bg-transparent text-sm text-center font-medium focus:outline-none"
+                    />
+                    <span className="text-xs text-on-surface-variant font-medium">min</span>
+                  </div>
                 </div>
               </div>
 
-              {/* Description */}
-              <div className="group">
-                <label 
-                  htmlFor="taskDesc" 
-                  className="text-[10px] font-bold tracking-wider uppercase text-on-surface-variant block mb-2 transition-colors group-focus-within:text-primary"
-                >
-                  Description (Optionnel)
+              <div>
+                <label className="text-xs font-semibold tracking-wider text-on-surface-variant block mb-3">
+                  DESCRIPTION (OPTIONNELLE)
                 </label>
                 <textarea
-                  id="taskDesc"
-                  rows={3}
+                  rows={2}
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Ajouter des notes ou consignes..."
-                  className="w-full bg-surface-glass border border-border-glass rounded-lg px-4 py-2.5 text-sm text-on-surface placeholder-on-surface-variant/40 focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all duration-300 resize-none"
+                  placeholder="Objectifs, ressources..."
+                  className="w-full bg-surface-glass border border-border-glass/50 rounded-xl px-4 py-3 text-sm text-on-background focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all resize-none"
                 />
               </div>
             </div>
 
             {/* Step 3: Priority & Reminder */}
-            <div className={`${currentStep === 3 ? 'block animate-in fade-in slide-in-from-right-4' : 'hidden md:block'} space-y-4`}>
-              {/* Priority Selection chips */}
+            <div className={`${currentStep === 3 ? 'block animate-in fade-in slide-in-from-right-4' : 'hidden md:block'} space-y-6`}>
               <div>
-                <label className="text-[10px] font-bold tracking-wider uppercase text-on-surface-variant block mb-2">
-                  Niveau de Priorité
+                <label className="text-xs font-semibold tracking-wider text-on-surface-variant block mb-3">
+                  NIVEAU DE PRIORITÉ
                 </label>
-                <div className="flex flex-col sm:flex-row flex-wrap gap-2">
+                <div className="grid grid-cols-2 gap-3">
                   {(["low", "medium", "high", "deep_work"] as const).map((p) => {
                     const isSelected = priority === p;
-                    const getLabel = () => {
-                      if (p === "low") return "Faible";
-                      if (p === "medium") return "Moyenne";
-                      if (p === "high") return "Élevée";
-                      return "Deep Work";
-                    };
+                    const labels = { low: "Faible", medium: "Moyenne", high: "Élevée", deep_work: "Deep Work" };
                     return (
                       <button
                         key={p}
                         type="button"
                         onClick={() => setPriority(p)}
-                        className={`px-4 py-2.5 rounded-lg border text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer w-full sm:w-auto ${
-                          isSelected
-                            ? "border-primary/50 bg-primary/10 text-primary shadow-glow-general-sm"
-                            : "border-border-glass bg-surface-glass text-on-surface-variant hover:text-on-surface"
-                        }`}
+                        className={`px-4 py-3 rounded-xl border text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer ${getPriorityStyle(p, isSelected)}`}
                       >
-                        {isSelected && <span className="w-1.5 h-1.5 rounded-full bg-primary shadow-glow-general-sm"></span>}
-                        <span>{getLabel()}</span>
+                        {isSelected && <span className="w-2 h-2 rounded-full bg-current shadow-sm"></span>}
+                        {labels[p]}
                       </button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Reminder Date & Time */}
-              <div className="group">
-                <label 
-                  htmlFor="dueDate" 
-                  className="text-[10px] font-bold tracking-wider uppercase text-on-surface-variant block mb-2 transition-colors group-focus-within:text-primary"
-                >
-                  Planifier un Rappel de Démarrage (Optionnel)
+              <div>
+                <label className="text-xs font-semibold tracking-wider text-on-surface-variant block mb-3">
+                  RAPPEL PLANIFIÉ
                 </label>
                 <input
-                  id="dueDate"
                   type="datetime-local"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full bg-surface-glass border border-border-glass rounded-lg px-4 py-3 text-sm text-on-surface focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all cursor-pointer"
+                  className="w-full bg-surface-glass border border-border-glass/50 rounded-xl px-4 py-3 text-sm text-on-background focus:outline-none focus:border-primary transition-all cursor-pointer"
                 />
               </div>
             </div>
           </div>
 
-          {/* Form Actions - Desktop (Always fully visible) */}
-          <div className="hidden md:flex p-5 pt-3.5 justify-end gap-3 border-t border-border-glass bg-surface-container/20 shrink-0">
+          {/* Desktop Actions */}
+          <div className="hidden md:flex p-6 border-t border-border-glass/50 bg-surface-glass shrink-0 justify-end gap-4">
             <button
               type="button"
               onClick={() => setIsAddTaskOpen(false)}
-              className="px-5 py-2.5 rounded-lg text-xs font-semibold text-on-surface-variant hover:text-on-surface hover:bg-surface-glass transition-all cursor-pointer"
+              className="px-6 py-2.5 rounded-full text-sm font-semibold text-on-surface-variant hover:text-on-background transition-colors cursor-pointer"
             >
               Annuler
             </button>
              <button
               type="submit"
-              className="px-5 py-2.5 rounded-lg text-xs font-bold bg-primary-container text-white shadow-glow-action-md hover:brightness-105 transition-all flex items-center gap-1 active:scale-95 cursor-pointer"
+              className="px-8 py-2.5 rounded-full text-sm font-bold bg-primary text-background shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-all hover:-translate-y-0.5 active:translate-y-0 cursor-pointer"
             >
-              <span>Créer la Tâche</span>
-              <span className="material-symbols-outlined text-[16px]">check_circle</span>
+              Créer la Tâche
             </button>
           </div>
 
-          {/* Form Actions - Mobile (Wizard Steps) */}
-          <div className="flex md:hidden p-4 justify-between items-center border-t border-border-glass bg-surface-container/20 shrink-0">
+          {/* Mobile Actions */}
+          <div className="flex md:hidden p-4 justify-between items-center border-t border-border-glass/50 bg-surface-glass shrink-0">
             {currentStep > 1 ? (
               <button
                 type="button"
                 onClick={handlePrev}
-                className="px-4 py-2.5 rounded-lg text-xs font-semibold text-on-surface-variant hover:bg-surface-glass transition-all flex items-center gap-1 cursor-pointer"
+                className="px-5 py-2.5 rounded-full text-sm font-semibold text-on-surface hover:bg-surface-container transition-colors cursor-pointer"
               >
-                <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-                Précédent
+                Retour
               </button>
             ) : (
               <button
                 type="button"
                 onClick={() => setIsAddTaskOpen(false)}
-                className="px-4 py-2.5 rounded-lg text-xs font-semibold text-on-surface-variant hover:bg-surface-glass transition-all cursor-pointer"
+                className="px-5 py-2.5 rounded-full text-sm font-semibold text-on-surface-variant hover:bg-surface-container transition-colors cursor-pointer"
               >
                 Annuler
               </button>
@@ -290,19 +242,17 @@ export const AddTaskModal: React.FC = () => {
                 type="button"
                 onClick={handleNext}
                 disabled={currentStep === 1 && !name.trim()}
-                className="px-5 py-2.5 rounded-lg text-xs font-bold bg-primary/20 text-primary hover:bg-primary/30 transition-all flex items-center gap-1 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2.5 rounded-full text-sm font-bold bg-surface-container text-primary hover:bg-primary hover:text-background transition-colors cursor-pointer disabled:opacity-50"
               >
                 Suivant
-                <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </button>
             ) : (
               <button
                 type="submit"
                 disabled={!name.trim()}
-                className="px-5 py-2.5 rounded-lg text-xs font-bold bg-primary-container text-white shadow-glow-action-md hover:brightness-105 transition-all flex items-center gap-1 active:scale-95 cursor-pointer disabled:opacity-50"
+                className="px-6 py-2.5 rounded-full text-sm font-bold bg-primary text-background shadow-lg shadow-primary/25 transition-all cursor-pointer disabled:opacity-50"
               >
-                Créer
-                <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                Terminer
               </button>
             )}
           </div>

@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
+import Link from "next/link";
 import { useApp, Task } from "@/context/AppContext";
+import { calculateDashboardChartData } from "@/utils/stats";
 import { TaskDetailsModal } from "@/components/TaskDetailsModal";
 import { FeedbackModal } from "@/components/FeedbackModal";
 
@@ -28,6 +30,9 @@ export default function DashboardPage() {
     isTimerMaximized,
     setIsTimerMaximized,
   } = useApp();
+
+  const [chartMode, setChartMode] = React.useState<"time" | "tasks">("time");
+  const chartData = React.useMemo(() => calculateDashboardChartData(tasks, chartMode), [tasks, chartMode]);
 
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
 
@@ -145,6 +150,8 @@ export default function DashboardPage() {
           {/* Ambient overlay glow behind active timer */}
           <div className="absolute inset-0 bg-primary opacity-5 mix-blend-screen blur-3xl pointer-events-none"></div>
 
+
+
           {/* Header & Controls Row */}
           <div className="w-full flex items-center justify-between mb-6 z-10">
             <h2 className="text-xs font-bold tracking-wider text-on-surface-variant uppercase">
@@ -258,7 +265,7 @@ export default function DashboardPage() {
             {/* Play/Pause */}
             <button
               onClick={toggleTimer}
-              className="w-16 h-16 rounded-full bg-primary-container text-white flex items-center justify-center shadow-glow-action-lg hover:shadow-glow-action-xl transition-all duration-300 active:scale-95 hover:scale-105"
+              className="w-16 h-16 rounded-full bg-primary text-background flex items-center justify-center shadow-glow-action-lg hover:shadow-glow-action-xl transition-all duration-300 active:scale-95 hover:scale-105"
             >
               <span className="material-symbols-outlined text-[30px]" style={{ fontVariationSettings: "'FILL' 1" }}>
                 {isRunning ? "pause" : "play_arrow"}
@@ -362,7 +369,27 @@ export default function DashboardPage() {
       <div className="lg:col-span-4 flex flex-col gap-6 w-full">
         {/* Performance Metrics Panel */}
         <div className="glass-panel rounded-xl p-6 flex flex-col h-full min-h-[460px]">
-          <h3 className="text-lg font-semibold text-on-background mb-6">Progrès Quotidien</h3>
+          <div className="mb-6 flex justify-between items-start">
+            <div>
+              <h3 className="text-lg font-semibold text-on-background">Progrès Quotidien</h3>
+              <p className="text-[10px] text-on-surface-variant mt-1">Temps de focus & Tâches</p>
+            </div>
+            {/* Switcher */}
+            <div className="flex bg-surface-container rounded-lg p-1">
+              <button 
+                onClick={() => setChartMode("time")}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${chartMode === 'time' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                Temps
+              </button>
+              <button 
+                onClick={() => setChartMode("tasks")}
+                className={`px-3 py-1 text-xs font-semibold rounded-md transition-all ${chartMode === 'tasks' ? 'bg-primary text-on-primary shadow-sm' : 'text-on-surface-variant hover:text-on-surface'}`}
+              >
+                Tâches
+              </button>
+            </div>
+          </div>
 
           {/* Quick Metrics grid */}
           <div className="grid grid-cols-2 gap-3 mb-8">
@@ -385,37 +412,33 @@ export default function DashboardPage() {
           </div>
 
           {/* Bar Chart (Dynamique & Contrasté) */}
-          <div className="flex-1 flex flex-col justify-end gap-3 relative pb-4 min-h-[160px]">
+          <div className="flex-1 flex flex-col justify-end gap-3 relative pb-4 min-h-[160px] mt-4">
             {/* Lignes de repères */}
-            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10 pb-8 px-2">
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10 pb-8 px-2 z-0">
               <div className="border-b border-on-surface w-full h-0"></div>
               <div className="border-b border-on-surface w-full h-0"></div>
               <div className="border-b border-on-surface w-full h-0"></div>
             </div>
             
-            <div className="flex items-end justify-between h-36 px-4 z-10">
-              {[
-                { day: "L", percentage: 40, active: false },
-                { day: "M", percentage: 70, active: false },
-                { day: "M", percentage: 90, active: false },
-                { day: "J", percentage: Math.min(100, Math.max(15, (totalFocusTimeToday / 7200) * 100)), active: true },
-                { day: "V", percentage: 0, active: false }
-              ].map((data, idx) => (
-                <div key={idx} className="flex flex-col items-center gap-2 w-full group relative">
+            <div className="flex items-end justify-between h-40 px-4 z-10">
+              {chartData.map((data, idx) => (
+                <div key={idx} className="flex flex-col items-center justify-end w-full group relative h-full">
                   {/* Tooltip on hover */}
-                  <div className="absolute -top-8 bg-surface-glass backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-on-surface opacity-0 group-hover:opacity-100 transition-opacity">
-                    {Math.round(data.percentage)}%
+                  <div className="absolute -top-8 bg-surface-glass backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-on-surface opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+                    {chartMode === 'time' ? `${data.value} min` : `${data.value} tâches`}
                   </div>
                   
-                  {/* Bar */}
-                  <div 
-                    className={`w-full max-w-[24px] rounded-t-md transition-all duration-500 cursor-pointer ${
-                      data.active 
-                        ? 'bg-gradient-to-t from-primary to-primary-container shadow-glow-general-md border border-primary/50' 
-                        : 'bg-on-surface/10 hover:bg-primary/40 border border-border-glass'
-                    }`} 
-                    style={{ height: `${Math.max(5, data.percentage)}%` }}
-                  ></div>
+                  {/* Bar Wrapper to ensure bottom alignment */}
+                  <div className="w-full flex justify-center items-end flex-1 mb-2">
+                    <div 
+                      className={`w-full max-w-[28px] rounded-t-md transition-all duration-500 cursor-pointer min-h-[4px] ${
+                        data.active 
+                          ? 'bg-gradient-to-t from-primary to-primary-container shadow-glow-general-md border border-primary/50' 
+                          : 'bg-on-surface/20 hover:bg-primary/40 border border-border-glass'
+                      }`} 
+                      style={{ height: `${Math.max(2, data.percentage)}%` }}
+                    ></div>
+                  </div>
                   
                   {/* Label */}
                   <span className={`text-xs font-bold ${data.active ? 'text-primary' : 'text-on-surface-variant'}`}>
@@ -434,9 +457,9 @@ export default function DashboardPage() {
               </span>
               <span className="text-sm font-semibold">{streak} Jours consécutifs</span>
             </div>
-            <div className="text-[10px] font-bold tracking-widest text-primary uppercase cursor-pointer hover:underline">
+            <Link href="/stats" className="text-[10px] font-bold tracking-widest text-primary uppercase cursor-pointer hover:underline transition-all">
               Détails
-            </div>
+            </Link>
           </div>
         </div>
       </div>

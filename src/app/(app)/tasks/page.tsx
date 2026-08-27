@@ -23,7 +23,7 @@ export default function TasksPage() {
 
   const [newColumnTitle, setNewColumnTitle] = useState("");
   const [isAddingColumn, setIsAddingColumn] = useState(false);
-  const [viewMode, setViewMode] = useState<"list" | "kanban">("list");
+  const [viewMode, setViewMode] = useState<"list" | "kanban">("kanban");
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   // Column Title Inline Editing States

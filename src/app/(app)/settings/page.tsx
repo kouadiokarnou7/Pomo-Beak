@@ -32,6 +32,42 @@ export default function SettingsPage() {
   const [notifyPush, setNotifyPush] = useState(themeSettings.notifyPush);
   const [notifyEmail, setNotifyEmail] = useState(themeSettings.notifyEmail);
 
+  // Custom audio state
+  const [customAudioName, setCustomAudioName] = useState<string | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== "undefined") {
+      const name = localStorage.getItem("focusflow_custom_alarm_name");
+      if (name) setCustomAudioName(name);
+    }
+  }, []);
+
+  const handleAudioUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    
+    // Check file size (max 2MB)
+    if (file.size > 2 * 1024 * 1024) {
+      showToast("Fichier trop volumineux (2MB max)", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      try {
+        localStorage.setItem("focusflow_custom_alarm", base64);
+        localStorage.setItem("focusflow_custom_alarm_name", file.name);
+        setCustomAudioName(file.name);
+        setSoundTrack("custom");
+        showToast("Sonnerie enregistrée avec succès !", "success");
+      } catch (err) {
+        showToast("Erreur: Mémoire saturée (fichier trop lourd).", "error");
+      }
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSaveDurations = (e: React.FormEvent) => {
     e.preventDefault();
     setTimerSettings(focusMin, shortMin, longMin);
@@ -329,7 +365,14 @@ export default function SettingsPage() {
               {/* Alarm configuration */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-4 border-t border-border-glass/10">
                 <div className="space-y-2">
-                  <label className="text-xs font-bold text-on-surface-variant">Son de Fin de Session</label>
+                  <label className="text-xs font-bold text-on-surface-variant flex justify-between items-center">
+                    <span>Son de Fin de Session</span>
+                    <label className="text-[10px] text-primary cursor-pointer hover:underline bg-primary/10 px-2 py-0.5 rounded-full flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[12px]">upload</span>
+                      Uploader (.mp3)
+                      <input type="file" accept="audio/*" className="hidden" onChange={handleAudioUpload} />
+                    </label>
+                  </label>
                   <select 
                     value={soundTrack}
                     onChange={(e) => setSoundTrack(e.target.value)}
@@ -338,6 +381,7 @@ export default function SettingsPage() {
                     <option value="zen_chime">Zen Chime (Ondes Sinus)</option>
                     <option value="digital_beep">Digital Beep (Ondes Carrées)</option>
                     <option value="soft_bell">Soft Bell (Triangle Doux)</option>
+                    {customAudioName && <option value="custom">Perso : {customAudioName}</option>}
                   </select>
                 </div>
 
@@ -365,42 +409,6 @@ export default function SettingsPage() {
                 >
                   Tester le son
                 </button>
-              </div>
-
-              {/* Ambient Focus Music */}
-              <div className="space-y-4 pt-4 border-t border-border-glass/10">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant">Musique d'Ambiance Focus</label>
-                    <select 
-                      value={ambientSound}
-                      onChange={(e) => setAmbientSound(e.target.value as any)}
-                      className="w-full bg-surface-glass border border-border-glass rounded-lg px-3 py-2 text-xs text-on-surface focus:outline-none focus:border-primary glass-select"
-                    >
-                      <option value="none">Aucune musique d'ambiance</option>
-                      <option value="white_noise">Bruit Blanc Constante</option>
-                      <option value="rain">Pluie Apaisante</option>
-                      <option value="lofi">Rythmes Lo-Fi Cosy</option>
-                      <option value="zen">Drone Zen de Méditation</option>
-                    </select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <label className="text-xs font-bold text-on-surface-variant flex justify-between">
-                      <span>Volume d'Ambiance</span>
-                      <span className="font-mono text-primary">{Math.round(ambientVolume * 100)}%</span>
-                    </label>
-                    <input 
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={ambientVolume}
-                      onChange={(e) => setAmbientVolume(parseFloat(e.target.value))}
-                      className="w-full accent-primary bg-white/5 h-1.5 rounded-lg cursor-pointer"
-                    />
-                  </div>
-                </div>
               </div>
 
               <div className="pt-6 flex justify-end">
