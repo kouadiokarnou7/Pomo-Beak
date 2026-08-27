@@ -14,6 +14,8 @@ export interface Task {
   status: string;
   createdAt: string;
   dueDate?: string; // Date et heure de rappel de démarrage (Start Reminder)
+  startedAt?: string; // Date de début réel de la tâche
+  completedAt?: string; // Date de complétion de la tâche
 }
 
 export type TimerMode = "focus" | "short_break" | "long_break";
@@ -101,161 +103,69 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
+//audio mis en stand by 
+let globalAudioContext: AudioContext | null = null;
+const getAudioContext = () => {
+  if (typeof window === "undefined") return null;
+  const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+  if (!AudioContextClass) return null;
+  if (!globalAudioContext) {
+    globalAudioContext = new AudioContextClass();
+  }
+  return globalAudioContext;
+};
+
 // Melodic chime using Web Audio API
 const playChime = (soundTrack: string) => {
   if (typeof window === "undefined") return;
   try {
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
     
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     
     if (soundTrack === "zen_chime") {
       osc1.type = "sine";
-      osc1.frequency.setValueAtTime(523.25, ctx.currentTime); // C5
-      osc1.frequency.setValueAtTime(659.25, ctx.currentTime + 0.15); // E5
+      osc1.frequency.setValueAtTime(523.25, ctx.currentTime);
+      osc1.frequency.setValueAtTime(659.25, ctx.currentTime + 0.15);
     } else if (soundTrack === "digital_beep") {
+      // Very aggressive rapid alternating beep (like an alarm)
       osc1.type = "square";
-      osc1.frequency.setValueAtTime(800, ctx.currentTime);
-      osc1.frequency.setValueAtTime(1000, ctx.currentTime + 0.1);
+      osc1.frequency.setValueAtTime(1200, ctx.currentTime);
+      osc1.frequency.setValueAtTime(800, ctx.currentTime + 0.1);
+      osc1.frequency.setValueAtTime(1200, ctx.currentTime + 0.2);
+      osc1.frequency.setValueAtTime(800, ctx.currentTime + 0.3);
+      osc1.frequency.setValueAtTime(1200, ctx.currentTime + 0.4);
+      osc1.frequency.setValueAtTime(800, ctx.currentTime + 0.5);
+      osc1.frequency.setValueAtTime(1200, ctx.currentTime + 0.6);
+      osc1.frequency.setValueAtTime(800, ctx.currentTime + 0.7);
     } else {
-      // soft_bell
+      // soft_bell -> turned into a louder phone-like ring
       osc1.type = "triangle";
-      osc1.frequency.setValueAtTime(440, ctx.currentTime); // A4
-      osc1.frequency.setValueAtTime(880, ctx.currentTime + 0.2); // A5
+      osc1.frequency.setValueAtTime(880, ctx.currentTime); 
+      osc1.frequency.setValueAtTime(1108.73, ctx.currentTime + 0.1); 
+      osc1.frequency.setValueAtTime(880, ctx.currentTime + 0.2); 
     }
 
-    gain1.gain.setValueAtTime(0.4, ctx.currentTime); // Augmenté pour être audible (40%)
-    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    // Volume extrême
+    gain1.gain.setValueAtTime(2.0, ctx.currentTime); // 200% volume
+    gain1.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 1.2); // 1.2s
     osc1.connect(gain1);
     gain1.connect(ctx.destination);
     osc1.start();
-    osc1.stop(ctx.currentTime + 0.45);
+    osc1.stop(ctx.currentTime + 1.25);
     
   } catch (e) {
     console.error("Failed to play chime sound:", e);
   }
 };
 
-// Ambient Sound Web Audio Synth Class
-class AmbientSynth {
-  private ctx: AudioContext | null = null;
-  private source: AudioNode | null = null;
-  private gainNode: GainNode | null = null;
-  private activeType: string = "none";
-  private oscillators: OscillatorNode[] = [];
-  
-  constructor() {}
-  
-  start(type: string, volume: number) {
-    if (typeof window === "undefined") return;
-    this.stop();
-    this.activeType = type;
-    if (type === "none") return;
-    
-    try {
-      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      this.ctx = new AudioContextClass();
-      this.gainNode = this.ctx.createGain();
-      this.gainNode.gain.setValueAtTime(volume * 0.08, this.ctx.currentTime); // keep it soft
-      this.gainNode.connect(this.ctx.destination);
-      
-      if (type === "white_noise" || type === "rain") {
-        const bufferSize = this.ctx.sampleRate * 2;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() * 2 - 1;
-        }
-        
-        const noiseSource = this.ctx.createBufferSource();
-        noiseSource.buffer = buffer;
-        noiseSource.loop = true;
-        
-        if (type === "rain") {
-          const filter = this.ctx.createBiquadFilter();
-          filter.type = "lowpass";
-          filter.frequency.setValueAtTime(450, this.ctx.currentTime);
-          noiseSource.connect(filter);
-          filter.connect(this.gainNode);
-        } else {
-          noiseSource.connect(this.gainNode);
-        }
-        
-        noiseSource.start(0);
-        this.source = noiseSource;
-      } else if (type === "zen") {
-        const osc1 = this.ctx.createOscillator();
-        const osc2 = this.ctx.createOscillator();
-        const osc3 = this.ctx.createOscillator();
-        
-        osc1.type = "sine";
-        osc1.frequency.setValueAtTime(110, this.ctx.currentTime); // A2
-        osc2.type = "sine";
-        osc2.frequency.setValueAtTime(165.4, this.ctx.currentTime); // E3 (detuned)
-        osc3.type = "sine";
-        osc3.frequency.setValueAtTime(220.2, this.ctx.currentTime); // A3 (detuned)
-        
-        osc1.connect(this.gainNode);
-        osc2.connect(this.gainNode);
-        osc3.connect(this.gainNode);
-        
-        osc1.start(0);
-        osc2.start(0);
-        osc3.start(0);
-        
-        this.oscillators = [osc1, osc2, osc3];
-      } else if (type === "lofi") {
-        // Vinyl crackle (dusty records)
-        const bufferSize = this.ctx.sampleRate * 4;
-        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-        const data = buffer.getChannelData(0);
-        for (let i = 0; i < bufferSize; i++) {
-          data[i] = Math.random() > 0.9997 ? (Math.random() * 0.2 - 0.1) : 0;
-        }
-        
-        const crackleSource = this.ctx.createBufferSource();
-        crackleSource.buffer = buffer;
-        crackleSource.loop = true;
-        
-        // Low cozy synthesizer pad
-        const osc = this.ctx.createOscillator();
-        osc.type = "triangle";
-        osc.frequency.setValueAtTime(130.81, this.ctx.currentTime); // C3
-        
-        crackleSource.connect(this.gainNode);
-        osc.connect(this.gainNode);
-        
-        crackleSource.start(0);
-        osc.start(0);
-        
-        this.source = crackleSource;
-        this.oscillators = [osc];
-      }
-    } catch (e) {
-      console.error("Failed to start ambient synth", e);
-    }
-  }
-  
-  stop() {
-    this.oscillators.forEach(osc => {
-      try { osc.stop(); } catch(e){}
-    });
-    this.oscillators = [];
-    if (this.source) {
-      try { (this.source as any).stop(); } catch(e){}
-      this.source = null;
-    }
-    if (this.ctx) {
-      try { this.ctx.close(); } catch(e){}
-      this.ctx = null;
-    }
-    this.activeType = "none";
-  }
-}
-
+// AmbientSynth was removed as requested (no background focus sounds).
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Auth & Task API Hooks
@@ -360,7 +270,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Refs declarations
   const timerIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const alarmIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const ambientSynthRef = useRef<AmbientSynth | null>(null);
+  
   const endTimeRef = useRef<number | null>(null);
   const timeLeftRef = useRef<number>(timeLeft);
   
@@ -370,23 +280,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const prevActiveTaskIdRef = useRef<string | null>(null);
   const prevEstimatedPomodorosRef = useRef<number | null>(null);
 
-  // Initialize Ambient Synth on mount
-  useEffect(() => {
-    ambientSynthRef.current = new AmbientSynth();
-    return () => {
-      ambientSynthRef.current?.stop();
-      if (alarmIntervalRef.current) clearInterval(alarmIntervalRef.current);
-    };
-  }, []);
 
-  // Control Ambient Audio play
-  useEffect(() => {
-    if (isRunning && themeSettings.ambientSound !== "none") {
-      ambientSynthRef.current?.start(themeSettings.ambientSound, themeSettings.ambientVolume);
-    } else {
-      ambientSynthRef.current?.stop();
-    }
-  }, [isRunning, themeSettings.ambientSound, themeSettings.ambientVolume]);
+
+
 
   const clearAlarm = useCallback(() => {
     if (alarmIntervalRef.current) {
@@ -400,22 +296,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     timeLeftRef.current = timeLeft;
   }, [timeLeft]);
 
-  // Sync Timer settings with selected mode duration
-  useEffect(() => {
-    if (!isTimerLoadedRef.current) return;
-    if (isInitialMount.current) {
-      isInitialMount.current = false;
-      return;
-    }
-    
-    let target = timerSettings.focus;
-    if (mode === "short_break") target = timerSettings.shortBreak;
-    if (mode === "long_break") target = timerSettings.longBreak;
-    
-    setTimeLeft(target);
-    setTotalDuration(target);
-    setIsRunning(false);
-  }, [mode, timerSettings]);
+  // The automatic timer synchronization useEffect was removed 
+  // to avoid resetting the timer on page refresh/hydration.
+  // Timer resets are now explicitly handled in user actions (skipTimer, setTimerSettings, etc.)
 
   // Set timer duration dynamically based on selected active task
   useEffect(() => {
@@ -511,7 +394,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         const storedSettings = localStorage.getItem("focusflow_timer_settings");
         if (storedSettings) {
           try {
-            setSettingsState(JSON.parse(storedSettings));
+            const parsed = JSON.parse(storedSettings);
+            setSettingsState(parsed);
           } catch (e) {}
         }
 
@@ -536,7 +420,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         if (storedTimer) {
           try {
             const parsed = JSON.parse(storedTimer);
-            if (parsed.mode) setMode(parsed.mode);
+            if (parsed.mode) {
+              setMode(parsed.mode);
+            }
             if (parsed.totalDuration) setTotalDuration(parsed.totalDuration);
             
             let time = parsed.timeLeft;
@@ -557,7 +443,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Save timer state to localStorage whenever it changes
   useEffect(() => {
-    if (hasHydrated) {
+    if (isTimerLoadedRef.current) {
       const stateToSave = {
         timeLeft,
         mode,
@@ -567,7 +453,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
       localStorage.setItem("focusflow_timer_state", JSON.stringify(stateToSave));
     }
-  }, [timeLeft, mode, totalDuration, isRunning, hasHydrated]);
+  }, [timeLeft, mode, totalDuration, isRunning]);
 
   // Apply theme dynamically to CSS variables and dark mode class
   useEffect(() => {
@@ -622,7 +508,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const handleTimerComplete = useCallback(() => {
     setIsRunning(false);
     
-    const play = () => playChime(themeSettings.soundTrack);
+    // Play Audio (Custom base64 or alarm.mp3 or fallback chime)
+    const play = () => {
+      try {
+        let src = '/alarm.mp3';
+        if (typeof window !== 'undefined') {
+          const custom = localStorage.getItem('focusflow_custom_alarm');
+          if (custom) src = custom;
+        }
+        const audio = new Audio(src);
+        audio.play().catch(() => playChime(themeSettings.soundTrack));
+      } catch (e) {
+        playChime(themeSettings.soundTrack);
+      }
+    };
     play();
 
     if (themeSettings.bellFrequency === "repeat_3") {
@@ -723,8 +622,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
           if (newCompleted > 0 && newCompleted % 4 === 0) {
             setMode("long_break");
+            setTimeLeft(timerSettings.longBreak);
+            setTotalDuration(timerSettings.longBreak);
           } else {
             setMode("short_break");
+            setTimeLeft(timerSettings.shortBreak);
+            setTotalDuration(timerSettings.shortBreak);
           }
 
           return newCompleted;
@@ -733,8 +636,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
     } else {
       setMode("focus");
+      
+      let target = timerSettings.focus;
+      if (activeTaskId) {
+        const activeTask = tasks.find((t) => t.id === activeTaskId);
+        if (activeTask && activeTask.estimatedPomodoros) {
+          target = activeTask.estimatedPomodoros * 60;
+        }
+      }
+      setTimeLeft(target);
+      setTotalDuration(target);
     }
-  }, [mode, activeTaskId, totalDuration, streak, lastActiveDate, themeSettings.soundTrack, user, apiUpdateTask, updateProfile]);
+  }, [mode, activeTaskId, tasks, totalDuration, streak, lastActiveDate, themeSettings.soundTrack, user, apiUpdateTask, updateProfile, timerSettings]);
 
   const handleTimerCompleteRef = useRef<() => void>(() => {});
   useEffect(() => {
@@ -788,6 +701,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const toggleTimer = useCallback(() => {
     clearAlarm();
     setIsRunning((prev) => !prev);
+    
+    // Resume audio context on user interaction to bypass autoplay policy
+    const ctx = getAudioContext();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume();
+    }
   }, [clearAlarm]);
 
   const resetTimer = useCallback(() => {
@@ -811,8 +730,37 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const skipTimer = useCallback(() => {
     clearAlarm();
     setIsRunning(false);
-    setMode((prevMode) => (prevMode === "focus" ? "short_break" : "focus"));
-  }, [clearAlarm]);
+    
+    let nextMode: "focus" | "short_break" | "long_break" = "focus";
+    
+    if (mode === "focus") {
+      // If they skip their 4th focus session (or 8th, etc), they go to a long break
+      if ((completedSessionsToday + 1) % 4 === 0) {
+        nextMode = "long_break";
+      } else {
+        nextMode = "short_break";
+      }
+    } else {
+      // Skipping any break goes back to focus
+      nextMode = "focus";
+    }
+    
+    setMode(nextMode);
+    
+    let target = timerSettings.focus;
+    if (nextMode === "short_break") target = timerSettings.shortBreak;
+    if (nextMode === "long_break") target = timerSettings.longBreak;
+    
+    if (activeTaskId && nextMode === "focus") {
+      const activeTask = tasks.find((t) => t.id === activeTaskId);
+      if (activeTask && activeTask.estimatedPomodoros) {
+        target = activeTask.estimatedPomodoros * 60;
+      }
+    }
+    
+    setTimeLeft(target);
+    setTotalDuration(target);
+  }, [clearAlarm, mode, timerSettings, activeTaskId, tasks, completedSessionsToday]);
 
   const setTimerSettings = useCallback((focusMin: number, shortMin: number, longMin: number) => {
     const updated = {
@@ -824,7 +772,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (typeof window !== "undefined") {
       localStorage.setItem("focusflow_timer_settings", JSON.stringify(updated));
     }
-  }, []);
+    
+    let target = updated.focus;
+    if (mode === "short_break") target = updated.shortBreak;
+    if (mode === "long_break") target = updated.longBreak;
+    
+    if (activeTaskId && mode === "focus") {
+      const activeTask = tasks.find((t) => t.id === activeTaskId);
+      if (activeTask && activeTask.estimatedPomodoros) {
+        target = activeTask.estimatedPomodoros * 60;
+      }
+    }
+    
+    setTimeLeft(target);
+    setTotalDuration(target);
+    setIsRunning(false);
+  }, [mode, activeTaskId, tasks]);
 
   // Save timer style preference
   useEffect(() => {
