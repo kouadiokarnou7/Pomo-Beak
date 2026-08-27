@@ -384,30 +384,45 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Bar Chart */}
+          {/* Bar Chart (Dynamique & Contrasté) */}
           <div className="flex-1 flex flex-col justify-end gap-3 relative pb-4 min-h-[160px]">
-            <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent pointer-events-none rounded-lg"></div>
-            <div className="flex items-end justify-between h-36 px-2 z-10">
-              <div className="flex flex-col items-center gap-2 w-full">
-                <div className="w-full max-w-[20px] bg-primary/25 rounded-t-sm h-[40%]"></div>
-                <span className="text-[10px] font-bold text-on-surface-variant/50">L</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 w-full">
-                <div className="w-full max-w-[20px] bg-primary/45 rounded-t-sm h-[70%]"></div>
-                <span className="text-[10px] font-bold text-on-surface-variant/50">M</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 w-full">
-                <div className="w-full max-w-[20px] bg-primary/80 rounded-t-sm h-[90%] shadow-glow-general-sm"></div>
-                <span className="text-[10px] font-bold text-on-surface-variant/50">M</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 w-full">
-                <div className="w-full max-w-[20px] bg-primary rounded-t-sm h-[60%] shadow-glow-general-md"></div>
-                <span className="text-[10px] font-bold text-primary font-bold">J</span>
-              </div>
-              <div className="flex flex-col items-center gap-2 w-full">
-                <div className="w-full max-w-[20px] bg-primary/15 rounded-t-sm h-[20%]"></div>
-                <span className="text-[10px] font-bold text-on-surface-variant/50">V</span>
-              </div>
+            {/* Lignes de repères */}
+            <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-10 pb-8 px-2">
+              <div className="border-b border-on-surface w-full h-0"></div>
+              <div className="border-b border-on-surface w-full h-0"></div>
+              <div className="border-b border-on-surface w-full h-0"></div>
+            </div>
+            
+            <div className="flex items-end justify-between h-36 px-4 z-10">
+              {[
+                { day: "L", percentage: 40, active: false },
+                { day: "M", percentage: 70, active: false },
+                { day: "M", percentage: 90, active: false },
+                { day: "J", percentage: Math.min(100, Math.max(15, (totalFocusTimeToday / 7200) * 100)), active: true },
+                { day: "V", percentage: 0, active: false }
+              ].map((data, idx) => (
+                <div key={idx} className="flex flex-col items-center gap-2 w-full group relative">
+                  {/* Tooltip on hover */}
+                  <div className="absolute -top-8 bg-surface-glass backdrop-blur-md px-2 py-1 rounded text-[10px] font-bold text-on-surface opacity-0 group-hover:opacity-100 transition-opacity">
+                    {Math.round(data.percentage)}%
+                  </div>
+                  
+                  {/* Bar */}
+                  <div 
+                    className={`w-full max-w-[24px] rounded-t-md transition-all duration-500 cursor-pointer ${
+                      data.active 
+                        ? 'bg-gradient-to-t from-primary to-primary-container shadow-glow-general-md border border-primary/50' 
+                        : 'bg-on-surface/10 hover:bg-primary/40 border border-border-glass'
+                    }`} 
+                    style={{ height: `${Math.max(5, data.percentage)}%` }}
+                  ></div>
+                  
+                  {/* Label */}
+                  <span className={`text-xs font-bold ${data.active ? 'text-primary' : 'text-on-surface-variant'}`}>
+                    {data.day}
+                  </span>
+                </div>
+              ))}
             </div>
           </div>
 

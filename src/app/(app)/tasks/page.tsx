@@ -385,9 +385,24 @@ export default function TasksPage() {
                           <h3 className={`text-sm font-bold truncate ${column.id === 'in_progress' ? 'text-primary' : 'text-on-surface'}`}>
                             {column.title}
                           </h3>
-                          <span className="bg-surface-glass px-2 py-0.5 rounded-full text-[9px] font-bold text-on-surface-variant font-mono">
-                            {tasks.filter((t) => t.status === column.id).length}
-                          </span>
+                          {(() => {
+                            const columnTasks = tasks.filter((t) => t.status === column.id);
+                            const count = columnTasks.length;
+                            const workload = columnTasks.reduce((acc, t) => acc + (t.estimatedPomodoros || 0), 0);
+                            return (
+                              <div className="flex items-center gap-1">
+                                <span className="bg-surface-glass px-2 py-0.5 rounded-full text-[9px] font-bold text-on-surface-variant font-mono" title={`${count} tâches`}>
+                                  {count}
+                                </span>
+                                {workload > 0 && (
+                                  <span className="bg-primary/10 border border-primary/20 text-primary px-2 py-0.5 rounded-full text-[9px] font-bold font-mono flex items-center gap-0.5" title={`Charge estimée: ${workload} min`}>
+                                    <span className="material-symbols-outlined text-[10px]">schedule</span>
+                                    {workload}
+                                  </span>
+                                )}
+                              </div>
+                            );
+                          })()}
                           <button
                             onClick={() => {
                               setEditingColumnId(column.id);
