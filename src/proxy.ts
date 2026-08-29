@@ -62,7 +62,10 @@ export async function proxy(request: NextRequest) {
       .eq('id', user.id)
       .single()
 
-    if (!profile || profile.role !== 'admin') {
+    const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+    const isAdmin = (profile && profile.role === 'admin') || (adminEmail && user.email === adminEmail);
+
+    if (!isAdmin) {
       const url = request.nextUrl.clone()
       url.pathname = '/'
       return NextResponse.redirect(url)

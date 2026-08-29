@@ -22,6 +22,7 @@ export default function DashboardPage() {
     streak,
     completedSessionsToday,
     totalFocusTimeToday,
+    dailyHistory,
     toggleTaskCompleted,
     setIsAddTaskOpen,
     setViewingTask,
@@ -32,7 +33,7 @@ export default function DashboardPage() {
   } = useApp();
 
   const [chartMode, setChartMode] = React.useState<"time" | "tasks">("time");
-  const chartData = React.useMemo(() => calculateDashboardChartData(tasks, chartMode), [tasks, chartMode]);
+  const chartData = React.useMemo(() => calculateDashboardChartData(tasks, chartMode, totalFocusTimeToday, dailyHistory), [tasks, chartMode, totalFocusTimeToday, dailyHistory]);
 
   const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false);
 
@@ -146,9 +147,9 @@ export default function DashboardPage() {
       {/* Left Column (Timer and tasks summary) */}
       <div className="lg:col-span-8 flex flex-col gap-6 w-full">
         {/* Timer Card */}
-        <div className="glass-panel-active rounded-xl p-6 md:p-8 flex flex-col items-center justify-center relative overflow-hidden min-h-[400px]">
+        <div className="glass-panel-active rounded-3xl p-8 md:p-10 flex flex-col items-center justify-center relative overflow-hidden min-h-[420px]">
           {/* Ambient overlay glow behind active timer */}
-          <div className="absolute inset-0 bg-primary opacity-5 mix-blend-screen blur-3xl pointer-events-none"></div>
+          <div className="absolute inset-0 bg-primary opacity-15 mix-blend-screen blur-[80px] pointer-events-none"></div>
 
 
 

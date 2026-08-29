@@ -16,7 +16,6 @@ export default function SettingsPage() {
   // Local state for durations
   const [focusMin, setFocusMin] = useState(timerSettings.focus / 60);
   const [shortMin, setShortMin] = useState(timerSettings.shortBreak / 60);
-  const [longMin, setLongMin] = useState(timerSettings.longBreak / 60);
 
   // Local states for theme & audio
   const [generalColor, setGeneralColor] = useState(themeSettings.generalColor);
@@ -70,7 +69,7 @@ export default function SettingsPage() {
 
   const handleSaveDurations = (e: React.FormEvent) => {
     e.preventDefault();
-    setTimerSettings(focusMin, shortMin, longMin);
+    setTimerSettings(focusMin, shortMin);
     showToast("Durées enregistrées avec succès !", "success");
   };
 
@@ -229,7 +228,7 @@ export default function SettingsPage() {
             <form onSubmit={handleSaveDurations} className="space-y-6 animate-fade-in">
               <h3 className="text-sm font-semibold tracking-wider text-on-surface-variant uppercase pb-2 border-b border-border-glass/40">Durées (Minutes)</h3>
               
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
                 {/* Focus duration */}
                 <div className="space-y-2">
                   <label className="text-xs font-bold text-on-surface-variant">Durée Focus</label>
@@ -267,28 +266,6 @@ export default function SettingsPage() {
                     <button
                       type="button"
                       onClick={() => setShortMin(Math.min(20, shortMin + 1))}
-                      className="w-8 h-8 rounded flex items-center justify-center hover:bg-surface-container transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">add</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Long break */}
-                <div className="space-y-2">
-                  <label className="text-xs font-bold text-on-surface-variant">Pause Longue</label>
-                  <div className="flex items-center justify-between bg-surface-glass border border-border-glass rounded-lg p-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setLongMin(Math.max(5, longMin - 5))}
-                      className="w-8 h-8 rounded flex items-center justify-center hover:bg-surface-container transition-colors cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">remove</span>
-                    </button>
-                    <span className="font-mono font-bold text-tertiary">{longMin} min</span>
-                    <button
-                      type="button"
-                      onClick={() => setLongMin(Math.min(60, longMin + 5))}
                       className="w-8 h-8 rounded flex items-center justify-center hover:bg-surface-container transition-colors cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[18px]">add</span>

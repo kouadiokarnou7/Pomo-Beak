@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useApp } from "@/context/AppContext";
 
 export const AddTaskModal: React.FC = () => {
-  const { isAddTaskOpen, setIsAddTaskOpen, addTask } = useApp();
+  const { isAddTaskOpen, setIsAddTaskOpen, addTask, showToast } = useApp();
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -39,6 +39,11 @@ export const AddTaskModal: React.FC = () => {
     setDueDate("");
     setCurrentStep(1);
     setIsAddTaskOpen(false);
+    
+    // Notification de succès
+    if (showToast) {
+      showToast("Tâche créée avec succès !", "success");
+    }
   };
 
   const handleNext = () => currentStep < totalSteps && setCurrentStep(currentStep + 1);

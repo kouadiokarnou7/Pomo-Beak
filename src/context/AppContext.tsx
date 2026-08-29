@@ -18,7 +18,7 @@ export interface Task {
   completedAt?: string; // Date de complétion de la tâche
 }
 
-export type TimerMode = "focus" | "short_break" | "long_break";
+export type TimerMode = "focus" | "short_break";
 
 interface AppContextType {
   // Timer States
@@ -29,8 +29,8 @@ interface AppContextType {
   toggleTimer: () => void;
   resetTimer: () => void;
   skipTimer: () => void;
-  setTimerSettings: (focusMin: number, shortMin: number, longMin: number) => void;
-  timerSettings: { focus: number; shortBreak: number; longBreak: number };
+  setTimerSettings: (focusMin: number, shortMin: number) => void;
+  timerSettings: { focus: number; shortBreak: number };
 
   // pomoBEAK Expanded States
   timerStyle: 'circular' | 'horizontal' | 'digital';
@@ -92,6 +92,7 @@ interface AppContextType {
   streak: number;
   completedSessionsToday: number;
   totalFocusTimeToday: number;
+  dailyHistory: Record<string, { focusTime: number; sessions: number; tasksCompleted: number }>;
 
   // Toast notifications
   toast: { message: string; type: "success" | "error" | "info" } | null;
@@ -192,9 +193,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load configuration from settings
   const [timerSettings, setSettingsState] = useState({
-    focus: 25 * 60, // in seconds
+    focus: 25 * 60,
     shortBreak: 5 * 60,
-    longBreak: 15 * 60,
   });
 
   const [themeSettings, setThemeSettingsState] = useState<{
@@ -246,6 +246,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [completedSessionsToday, setCompletedSessionsToday] = useState(0);
   const [totalFocusTimeToday, setTotalFocusTimeToday] = useState(0);
   const [lastActiveDate, setLastActiveDate] = useState<string | null>(null);
+  // Historique quotidien : clé = "YYYY-MM-DD", valeur = { focusTime (sec), sessions, tasksCompleted }
+  const [dailyHistory, setDailyHistory] = useState<Record<string, { focusTime: number; sessions: number; tasksCompleted: number }>>({});
 
   // User role state
   const [role, setRole] = useState<string>("user");
@@ -280,10 +282,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const prevActiveTaskIdRef = useRef<string | null>(null);
   const prevEstimatedPomodorosRef = useRef<number | null>(null);
 
-
-
-
-
   const clearAlarm = useCallback(() => {
     if (alarmIntervalRef.current) {
       clearInterval(alarmIntervalRef.current);
@@ -295,10 +293,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   useEffect(() => {
     timeLeftRef.current = timeLeft;
   }, [timeLeft]);
-
-  // The automatic timer synchronization useEffect was removed 
-  // to avoid resetting the timer on page refresh/hydration.
-  // Timer resets are now explicitly handled in user actions (skipTimer, setTimerSettings, etc.)
 
   // Set timer duration dynamically based on selected active task
   useEffect(() => {
@@ -349,13 +343,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Fetch profile stats from Supabase
         const { data: profile, error: profileError } = await fetchProfile(user.id);
-        console.log("pomoBEAK Profile fetch result:", { profile, profileError });
         if (profile) {
           setStreak(profile.streak || 0);
           setCompletedSessionsToday(profile.completed_sessions_today || 0);
           setTotalFocusTimeToday(profile.total_focus_time_today || 0);
-          if (profile.role) {
-            console.log("pomoBEAK User role loaded:", profile.role);
+          const adminEmail = process.env.NEXT_PUBLIC_ADMIN_EMAIL;
+          if (adminEmail && user.email === adminEmail) {
+            setRole("admin");
+          } else if (profile.role) {
             setRole(profile.role);
           }
         }
@@ -389,6 +384,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             if (parsed.totalFocusTimeToday !== undefined) setTotalFocusTimeToday(parsed.totalFocusTimeToday);
             if (parsed.lastActiveDate !== undefined) setLastActiveDate(parsed.lastActiveDate);
           } catch (e) {}
+        }
+        // Charger l'historique quotidien
+        const storedHistory = localStorage.getItem("focusflow_daily_history");
+        if (storedHistory) {
+          try {
+            setDailyHistory(JSON.parse(storedHistory));
+          } catch (e) {}
+        } else {
+          // Migration : si on a déjà un totalFocusTimeToday mais pas d'historique,
+          // on crée l'entrée du jour avec les données existantes
+          const statsData = localStorage.getItem("focusflow_stats");
+          if (statsData) {
+            try {
+              const sp = JSON.parse(statsData);
+              if (sp.totalFocusTimeToday && sp.lastActiveDate) {
+                const migrated: Record<string, { focusTime: number; sessions: number; tasksCompleted: number }> = {
+                  [sp.lastActiveDate]: {
+                    focusTime: sp.totalFocusTimeToday,
+                    sessions: sp.completedSessionsToday || 1,
+                    tasksCompleted: 0,
+                  }
+                };
+                setDailyHistory(migrated);
+                localStorage.setItem("focusflow_daily_history", JSON.stringify(migrated));
+              }
+            } catch (e) {}
+          }
         }
 
         const storedSettings = localStorage.getItem("focusflow_timer_settings");
@@ -439,7 +461,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
     loadInitialData();
-  }, [user, fetchTasks, fetchColumns]);
+  }, [user, fetchTasks, fetchColumns, fetchProfile]);
 
   // Save timer state to localStorage whenever it changes
   useEffect(() => {
@@ -497,18 +519,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   }, [columns, hasHydrated]);
 
-  // Save tasks to local storage
-  const saveTasks = useCallback((newTasks: Task[]) => {
-    setTasks(newTasks);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("focusflow_tasks", JSON.stringify(newTasks));
-    }
-  }, []);
-
   const handleTimerComplete = useCallback(() => {
     setIsRunning(false);
     
-    // Play Audio (Custom base64 or alarm.mp3 or fallback chime)
+    // Play Audio
     const play = () => {
       try {
         let src = '/alarm.mp3';
@@ -576,64 +590,68 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const focusSec = totalDuration;
       const todayStr = new Date().toISOString().split("T")[0]; // YYYY-MM-DD
 
-      setTotalFocusTimeToday((prevFocusTime) => {
-        const newFocusTime = prevFocusTime + focusSec;
-        setCompletedSessionsToday((prevCompleted) => {
-          const newCompleted = prevCompleted + 1;
-          
-          // Calculate new streak
-          let newStreak = streak;
-          if (!lastActiveDate) {
-            newStreak = 1;
-          } else if (lastActiveDate !== todayStr) {
-            const lastDate = new Date(lastActiveDate);
-            const todayDate = new Date(todayStr);
-            const diffTime = todayDate.getTime() - lastDate.getTime();
-            const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
-            
-            if (diffDays === 1) {
-              newStreak = streak + 1;
-            } else if (diffDays > 1) {
-              newStreak = 1; // reset to 1
+      const newFocusTime = totalFocusTimeToday + focusSec;
+      setTotalFocusTimeToday(newFocusTime);
+      
+      const newCompleted = completedSessionsToday + 1;
+      setCompletedSessionsToday(newCompleted);
+      
+      // Calculate new streak
+      let newStreak = streak;
+      if (!lastActiveDate) {
+        newStreak = 1;
+      } else if (lastActiveDate !== todayStr) {
+        const lastDate = new Date(lastActiveDate);
+        const todayDate = new Date(todayStr);
+        const diffTime = todayDate.getTime() - lastDate.getTime();
+        const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+        
+        if (diffDays === 1) {
+          newStreak = streak + 1;
+        } else if (diffDays > 1) {
+          newStreak = 1; // reset to 1
+        }
+      }
+      setStreak(newStreak);
+      setLastActiveDate(todayStr);
+      
+      if (typeof window !== "undefined") {
+        localStorage.setItem(
+          "focusflow_stats",
+          JSON.stringify({
+            streak: newStreak,
+            completedSessionsToday: newCompleted,
+            totalFocusTimeToday: newFocusTime,
+            lastActiveDate: todayStr,
+          })
+        );
+        // Sauvegarder l'historique quotidien
+        setDailyHistory(prev => {
+          const existing = prev[todayStr] || { focusTime: 0, sessions: 0, tasksCompleted: 0 };
+          const updated = {
+            ...prev,
+            [todayStr]: {
+              focusTime: existing.focusTime + focusSec,
+              sessions: existing.sessions + 1,
+              tasksCompleted: existing.tasksCompleted,
             }
-          }
-          setStreak(newStreak);
-          setLastActiveDate(todayStr);
-          
-          if (typeof window !== "undefined") {
-            localStorage.setItem(
-              "focusflow_stats",
-              JSON.stringify({
-                streak: newStreak,
-                completedSessionsToday: newCompleted,
-                totalFocusTimeToday: newFocusTime,
-                lastActiveDate: todayStr,
-              })
-            );
-          }
-
-          if (user) {
-            updateProfile(user.id, {
-              streak: newStreak,
-              completed_sessions_today: newCompleted,
-              total_focus_time_today: newFocusTime,
-            });
-          }
-
-          if (newCompleted > 0 && newCompleted % 4 === 0) {
-            setMode("long_break");
-            setTimeLeft(timerSettings.longBreak);
-            setTotalDuration(timerSettings.longBreak);
-          } else {
-            setMode("short_break");
-            setTimeLeft(timerSettings.shortBreak);
-            setTotalDuration(timerSettings.shortBreak);
-          }
-
-          return newCompleted;
+          };
+          localStorage.setItem("focusflow_daily_history", JSON.stringify(updated));
+          return updated;
         });
-        return newFocusTime;
-      });
+      }
+
+      if (user) {
+        updateProfile(user.id, {
+          streak: newStreak,
+          completed_sessions_today: newCompleted,
+          total_focus_time_today: newFocusTime,
+        });
+      }
+
+      setMode("short_break");
+      setTimeLeft(timerSettings.shortBreak);
+      setTotalDuration(timerSettings.shortBreak);
     } else {
       setMode("focus");
       
@@ -647,7 +665,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setTimeLeft(target);
       setTotalDuration(target);
     }
-  }, [mode, activeTaskId, tasks, totalDuration, streak, lastActiveDate, themeSettings.soundTrack, user, apiUpdateTask, updateProfile, timerSettings]);
+  }, [mode, activeTaskId, tasks, totalDuration, streak, lastActiveDate, themeSettings.soundTrack, user, apiUpdateTask, updateProfile, timerSettings, completedSessionsToday, totalFocusTimeToday]);
 
   const handleTimerCompleteRef = useRef<() => void>(() => {});
   useEffect(() => {
@@ -690,19 +708,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearInterval(timerIntervalRef.current);
       }
     }
-
-    return () => {
-      if (timerIntervalRef.current) {
-        clearInterval(timerIntervalRef.current);
-      }
-    };
-  }, [isRunning, mode, activeTaskId]);
+  }, [isRunning]);
 
   const toggleTimer = useCallback(() => {
     clearAlarm();
     setIsRunning((prev) => !prev);
     
-    // Resume audio context on user interaction to bypass autoplay policy
     const ctx = getAudioContext();
     if (ctx && ctx.state === 'suspended') {
       ctx.resume();
@@ -714,9 +725,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setIsRunning(false);
     let target = timerSettings.focus;
     if (mode === "short_break") target = timerSettings.shortBreak;
-    if (mode === "long_break") target = timerSettings.longBreak;
     
-    // Override if active task is selected
     if (activeTaskId && mode === "focus") {
       const activeTask = tasks.find((t) => t.id === activeTaskId);
       if (activeTask && activeTask.estimatedPomodoros) {
@@ -731,25 +740,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clearAlarm();
     setIsRunning(false);
     
-    let nextMode: "focus" | "short_break" | "long_break" = "focus";
-    
-    if (mode === "focus") {
-      // If they skip their 4th focus session (or 8th, etc), they go to a long break
-      if ((completedSessionsToday + 1) % 4 === 0) {
-        nextMode = "long_break";
-      } else {
-        nextMode = "short_break";
-      }
-    } else {
-      // Skipping any break goes back to focus
-      nextMode = "focus";
-    }
-    
+    const nextMode = mode === "focus" ? "short_break" : "focus";
     setMode(nextMode);
     
-    let target = timerSettings.focus;
-    if (nextMode === "short_break") target = timerSettings.shortBreak;
-    if (nextMode === "long_break") target = timerSettings.longBreak;
+    let target = nextMode === "focus" ? timerSettings.focus : timerSettings.shortBreak;
     
     if (activeTaskId && nextMode === "focus") {
       const activeTask = tasks.find((t) => t.id === activeTaskId);
@@ -760,13 +754,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     setTimeLeft(target);
     setTotalDuration(target);
-  }, [clearAlarm, mode, timerSettings, activeTaskId, tasks, completedSessionsToday]);
+  }, [clearAlarm, mode, timerSettings, activeTaskId, tasks]);
 
-  const setTimerSettings = useCallback((focusMin: number, shortMin: number, longMin: number) => {
+  const setTimerSettings = useCallback((focusMin: number, shortMin: number) => {
     const updated = {
       focus: focusMin * 60,
       shortBreak: shortMin * 60,
-      longBreak: longMin * 60,
     };
     setSettingsState(updated);
     if (typeof window !== "undefined") {
@@ -775,7 +768,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     let target = updated.focus;
     if (mode === "short_break") target = updated.shortBreak;
-    if (mode === "long_break") target = updated.longBreak;
     
     if (activeTaskId && mode === "focus") {
       const activeTask = tasks.find((t) => t.id === activeTaskId);
@@ -1079,6 +1071,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     streak,
     completedSessionsToday,
     totalFocusTimeToday,
+    dailyHistory,
 
     toast,
     showToast,
@@ -1114,6 +1107,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     streak,
     completedSessionsToday,
     totalFocusTimeToday,
+    dailyHistory,
     toast,
     showToast,
     role,
